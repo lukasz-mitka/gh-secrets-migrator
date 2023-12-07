@@ -193,9 +193,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Output ""Cleaning up...""
-          Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/git/${{{{ github.ref }}}}"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/actions/secrets/SECRETS_MIGRATOR_TARGET_PAT"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/actions/secrets/SECRETS_MIGRATOR_SOURCE_PAT"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
+          Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/git/${{{{ github.ref }}}}"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
 ";
 
             return result;
