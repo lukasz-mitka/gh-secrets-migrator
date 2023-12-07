@@ -191,8 +191,11 @@ jobs:
       - name: Cleanup
         if: always()
         shell: pwsh
+        env:
+          SOURCE_PAT: ${{{{ secrets.SECRETS_MIGRATOR_SOURCE_PAT }}}}
         run: |
           Write-Output ""Cleaning up...""
+          $sourcePat = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("":$($env:SOURCE_PAT)""))
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/actions/secrets/SECRETS_MIGRATOR_TARGET_PAT"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/actions/secrets/SECRETS_MIGRATOR_SOURCE_PAT"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/git/${{{{ github.ref }}}}"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
