@@ -125,19 +125,29 @@ namespace SecretsMigrator
         private static string GenerateWorkflow(string sourceOrg, string sourceRepo, string targetOrg, string targetRepo, string branchName, bool ignoreOrgSecrets = false)
         {
             var result = $@"
-name: move-secrets
+name: migrate-secrets
 on:
   push:
     branches: [ ""{branchName}"" ]
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Install Crypto Package
         run: |
           Install-Package -Name Sodium.Core -ProviderName NuGet -Scope CurrentUser -RequiredVersion 1.3.0 -Destination . -Force
         shell: pwsh
       - name: Migrate Secrets
+        env:
+          REPO_SECRETS: ${{{{ toJSON(secrets) }}}}
+          TARGET_PAT: ${{{{ secrets.SECRETS_MIGRATOR_TARGET_PAT }}}}
+          SOURCE_PAT: ${{{{ secrets.SECRETS_MIGRATOR_SOURCE_PAT }}}}
+          TARGET_ORG: '{targetOrg}'
+          TARGET_REPO: '{targetRepo}'
+          SOURCE_ORG: '{sourceOrg}'
+          SOURCE_REPO: '{sourceRepo}'
+          IGNORE_ORG_SECRETS: '{ignoreOrgSecrets}'
+        shell: pwsh
         run: |
           $sodiumPath = Resolve-Path "".\Sodium.Core.1.3.0\lib\\netstandard2.1\Sodium.Core.dll""
           [System.Reflection.Assembly]::LoadFrom($sodiumPath)
@@ -155,17 +165,17 @@ jobs:
             $orgSecretsResponse = Invoke-RestMethod -Uri ""https://api.github.com/repos/$env:SOURCE_ORG/$env:SOURCE_REPO/actions/organization-secrets"" -Method ""GET"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
             $ignoreSecrets += $orgSecretsResponse.secrets.name
           }}
- 
+
           $secrets | Get-Member -MemberType NoteProperty | ForEach-Object {{
             $secretName = $_.Name
             $secretValue = $secrets.""$secretName""
-     
+
             if ($secretName -notin $ignoreSecrets) {{
               Write-Output ""Migrating Secret: $secretName""
               $secretBytes = [Text.Encoding]::UTF8.GetBytes($secretValue)
               $sealedPublicKeyBox = [Sodium.SealedPublicKeyBox]::Create($secretBytes, $publicKey)
               $encryptedSecret = [Convert]::ToBase64String($sealedPublicKeyBox)
-                 
+
               $Params = @{{
                 Uri = ""https://api.github.com/repos/$env:TARGET_ORG/$env:TARGET_REPO/actions/secrets/$secretName""
                 Headers = @{{
@@ -178,21 +188,14 @@ jobs:
               $createSecretResponse = Invoke-RestMethod @Params
             }}
           }}
-
+      - name: Cleanup
+        if: always()
+        shell: pwsh
+        run: |
           Write-Output ""Cleaning up...""
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/git/${{{{ github.ref }}}}"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/actions/secrets/SECRETS_MIGRATOR_TARGET_PAT"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
           Invoke-RestMethod -Uri ""https://api.github.com/repos/${{{{ github.repository }}}}/actions/secrets/SECRETS_MIGRATOR_SOURCE_PAT"" -Method ""DELETE"" -Headers @{{ Authorization = ""Basic $sourcePat"" }}
-        env:
-          REPO_SECRETS: ${{{{ toJSON(secrets) }}}}
-          TARGET_PAT: ${{{{ secrets.SECRETS_MIGRATOR_TARGET_PAT }}}}
-          SOURCE_PAT: ${{{{ secrets.SECRETS_MIGRATOR_SOURCE_PAT }}}}
-          TARGET_ORG: '{targetOrg}'
-          TARGET_REPO: '{targetRepo}'
-          SOURCE_ORG: '{sourceOrg}'
-          SOURCE_REPO: '{sourceRepo}'
-          IGNORE_ORG_SECRETS: '{ignoreOrgSecrets}'
-        shell: pwsh
 ";
 
             return result;
