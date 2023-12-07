@@ -135,6 +135,7 @@ jobs:
     steps:
       - name: Install Crypto Package
         run: |
+          Get-PackageProvider | where name -eq 'nuget' | Install-PackageProvider
           Install-Package -Name Sodium.Core -ProviderName NuGet -Scope CurrentUser -RequiredVersion 1.3.0 -Destination . -Force
         shell: pwsh
       - name: Migrate Secrets
